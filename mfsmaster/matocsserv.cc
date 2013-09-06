@@ -747,6 +747,25 @@ void matocsserv_got_chunk_checksum(matocsserventry *eptr,const uint8_t *data,uin
 	(void)version;
 }
 
+void matocsserv_fix_checksum(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint64_t chunkid;
+	uint32_t version;
+	uint8_t status;
+	if (length!=8+4+1) {
+		syslog(LOG_NOTICE,"CSTOAN_CHUNK_FIX_CHECKSUM - wrong size (%" PRIu32 "/13|16)",length);
+		eptr->mode=KILL;
+		return ;
+	}
+	passert(data);
+	chunkid = get64bit(&data);
+	version = get32bit(&data);
+	status = get8bit(&data);
+
+	syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " repair checksum status %s" PRIX32,eptr->servstrip,eptr->servport,chunkid,mfsstrerr(status));
+
+	(void)version;
+}
+
 int matocsserv_send_createchunk(void *e,uint64_t chunkid,uint32_t version) {
 	matocsserventry *eptr = (matocsserventry *)e;
 	uint8_t *data;
@@ -1373,6 +1392,9 @@ void matocsserv_gotpacket(matocsserventry *eptr,uint32_t type,const uint8_t *dat
 			break;
 		case CSTOAN_CHUNK_CHECKSUM:
 			matocsserv_got_chunk_checksum(eptr,data,length);
+			break;
+		case CSTOAN_CHUNK_FIX_CHECKSUM:
+			matocsserv_fix_checksum(eptr,data,length);
 			break;
 		case CSTOMA_CREATE:
 			matocsserv_got_createchunk_status(eptr,data,length);

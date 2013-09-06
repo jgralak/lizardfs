@@ -572,7 +572,13 @@
 // chunkid:64 version:32 1024*[checksum:32]
 // chunkid:64 version:32 status:8
 
+// 0x0130
+#define ANTOCS_CHUNK_FIX_CHECKSUM (PROTO_BASE+304)
+// chunkid:64 version:32
 
+// 0x0131
+#define CSTOAN_CHUNK_FIX_CHECKSUM (PROTO_BASE+305)
+// chunkid:64 version:32 status:8
 
 
 

@@ -61,6 +61,8 @@ int hdd_check_version(uint64_t chunkid,uint32_t version);
 int hdd_get_blocks(uint64_t chunkid,uint32_t version,uint16_t *blocks);
 int hdd_get_checksum(uint64_t chunkid, uint32_t version, uint32_t *checksum);
 int hdd_get_checksum_tab(uint64_t chunkid, uint32_t version, uint8_t *checksum_tab);
+int hdd_fix_checksum(uint64_t chunkid, uint32_t version);
+
 
 /* chunk operations */
 

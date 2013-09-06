@@ -2361,7 +2361,73 @@ int hdd_get_checksum_tab(uint64_t chunkid,uint32_t version,uint8_t *checksum_tab
 	return STATUS_OK;
 }
 
+int hdd_fix_checksum(uint64_t chunkid,uint32_t version) {
+	int status;
+	chunk *c;
+	uint32_t crc;
+	uint8_t *ptr;
+	uint16_t block;
+	uint32_t bcrc;
+	int32_t retsize;
 
+	c = hdd_chunk_find(chunkid);
+	if (c==NULL) {
+		return ERROR_NOCHUNK;
+	}
+	if (c->version!=version && version>0) {
+		hdd_chunk_release(c);
+		return ERROR_WRONGVERSION;
+	}
+	status = hdd_io_begin(c,0);
+	if (status!=STATUS_OK) {
+		hdd_error_occured(c);	// uses and preserves errno !!!
+		hdd_report_damaged_chunk(chunkid);
+		hdd_chunk_release(c);
+		return status;
+	}
+	lseek(c->fd,CHUNKHDRSIZE,SEEK_SET);
+	ptr = c->crc;
+	for (block=0 ; block<c->blocks ; block++) {
+#ifdef PRESERVE_BLOCK
+		retsize = read(c->fd,c->block,MFSBLOCKSIZE);
+#else /* PRESERVE_BLOCK */
+		retsize = read(c->fd,blockbuffer,MFSBLOCKSIZE);
+#endif /* PRESERVE_BLOCK */
+		if (retsize!=MFSBLOCKSIZE) {
+			hdd_error_occured(c);	// uses and preserves errno !!!
+			mfs_arg_errlog_silent(LOG_WARNING,"test_chunk: file:%s - data read error",c->filename);
+			hdd_io_end(c);
+			hdd_chunk_release(c);
+			return ERROR_IO;
+		}
+		hdd_stats_read(MFSBLOCKSIZE);
+#ifdef PRESERVE_BLOCK
+		c->blockno = block;
+#endif
+		bcrc = get32bit((const uint8_t**)&ptr);
+#ifdef PRESERVE_BLOCK
+		crc= mycrc32(0,c->block,MFSBLOCKSIZE);
+		if (bcrc!=crc) {
+#else /* PRESERVE_BLOCK */
+		crc = mycrc32(0,blockbuffer,MFSBLOCKSIZE);
+		if (bcrc!=crc)) {
+#endif /* PRESERVE_BLOCK */
+			ptr-=-sizeof(crc);
+			put32bit(&ptr, crc);
+			c->crcchanged = 1;
+		}
+	}
+
+	status = hdd_io_end(c);
+	if (status!=STATUS_OK) {
+		hdd_error_occured(c);	// uses and preserves errno !!!
+		hdd_report_damaged_chunk(chunkid);
+		hdd_chunk_release(c);
+		return status;
+	}
+	hdd_chunk_release(c);
+	return STATUS_OK;
+}
 
 
 

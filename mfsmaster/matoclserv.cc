@@ -2471,7 +2471,7 @@ void matoclserv_fuse_repair(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	gid = get32bit(&data);
 	matoclserv_ugid_remap(eptr,&uid,&gid);
 	status = fs_repair(eptr->sesdata->rootinode,eptr->sesdata->sesflags,inode,uid,gid,&chunksnotchanged,&chunkserased,&chunksrepaired);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REPAIR,(status!=STATUS_OK)?5:16);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REPAIR,(status!=STATUS_OK)?4+1:4+4+4+4);
 	put32bit(&ptr,msgid);
 	if (status!=0) {
 		put8bit(&ptr,status);
