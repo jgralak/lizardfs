@@ -718,6 +718,30 @@ void masterconn_chunk_checksum_tab(masterconn *eptr,const uint8_t *data,uint32_t
 	}
 }
 
+void masterconn_chunk_fix_checksum(masterconn *eptr,const uint8_t *data,uint32_t length) {
+	uint64_t chunkid;
+	uint32_t version;
+	uint8_t *ptr;
+	uint8_t status;
+	void *packet;
+	syslog(LOG_NOTICE,"MATOCS_CHUNK_FIX_CHECKSUM -)debug ");
+	if (length!=8+4) {
+		syslog(LOG_NOTICE,"MATOCS_CHUNK_FIX_CHECKSUM - wrong size (%" PRIu32 "/12)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	chunkid = get64bit(&data);
+	version = get32bit(&data);
+	status = hdd_fix_checksum(chunkid,version);
+
+	packet = masterconn_create_detached_packet(CSTOMA_CHUNK_FIX_CHECKSUM,8+4+1);
+	ptr = masterconn_get_packet_data(packet);
+	put64bit(&ptr,chunkid);
+	put32bit(&ptr,version);
+	put8bit(&ptr,status);
+
+}
+
 void masterconn_gotpacket(masterconn *eptr,uint32_t type,const uint8_t *data,uint32_t length) {
 	switch (type) {
 		case ANTOAN_NOP:
@@ -761,6 +785,9 @@ void masterconn_gotpacket(masterconn *eptr,uint32_t type,const uint8_t *data,uin
 			break;
 		case ANTOCS_CHUNK_CHECKSUM_TAB:
 			masterconn_chunk_checksum_tab(eptr,data,length);
+			break;
+		case MATOCS_CHUNK_FIX_CHECKSUM:
+			masterconn_chunk_fix_checksum(eptr,data,length);
 			break;
 		default:
 			syslog(LOG_NOTICE,"got unknown message (type:%" PRIu32 ")",type);

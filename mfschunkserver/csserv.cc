@@ -1019,26 +1019,6 @@ void csserv_chunk_checksum_tab(csserventry *eptr,const uint8_t *data,uint32_t le
 	}
 }
 
-void csserv_chunk_fix_checksum(csserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint64_t chunkid;
-	uint32_t version;
-	uint8_t *ptr;
-	uint8_t status;
-
-	if (length!=8+4) {
-		syslog(LOG_NOTICE,"ANTOCS_CHUNK_CHECKSUM - wrong size (%" PRIu32 "/12)",length);
-		eptr->state = CLOSE;
-		return;
-	}
-	chunkid = get64bit(&data);
-	version = get32bit(&data);
-	status = hdd_fix_checksum(chunkid,version);
-
-	ptr = csserv_create_attached_packet(eptr,CSTOAN_CHUNK_FIX_CHECKSUM,8+4+1);
-	put8bit(&ptr,status);
-
-}
-
 void csserv_hdd_list_v1(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t l;
 	uint8_t *ptr;
@@ -1183,9 +1163,6 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 			break;
 		case ANTOCS_CHUNK_CHECKSUM_TAB:
 			csserv_chunk_checksum_tab(eptr,data,length);
-			break;
-		case ANTOCS_CHUNK_FIX_CHECKSUM:
-			csserv_chunk_fix_checksum(eptr,data,length);
 			break;
 		case CLTOCS_HDD_LIST_V1:
 			csserv_hdd_list_v1(eptr,data,length);

@@ -2374,10 +2374,7 @@ int hdd_fix_checksum(uint64_t chunkid,uint32_t version) {
 	if (c==NULL) {
 		return ERROR_NOCHUNK;
 	}
-	if (c->version!=version && version>0) {
-		hdd_chunk_release(c);
-		return ERROR_WRONGVERSION;
-	}
+
 	status = hdd_io_begin(c,0);
 	if (status!=STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
@@ -2406,13 +2403,13 @@ int hdd_fix_checksum(uint64_t chunkid,uint32_t version) {
 #endif
 		bcrc = get32bit((const uint8_t**)&ptr);
 #ifdef PRESERVE_BLOCK
-		crc= mycrc32(0,c->block,MFSBLOCKSIZE);
+		crc = mycrc32(0,c->block,MFSBLOCKSIZE);
 		if (bcrc!=crc) {
 #else /* PRESERVE_BLOCK */
 		crc = mycrc32(0,blockbuffer,MFSBLOCKSIZE);
 		if (bcrc!=crc)) {
 #endif /* PRESERVE_BLOCK */
-			ptr-=-sizeof(crc);
+			ptr -= sizeof(crc);
 			put32bit(&ptr, crc);
 			c->crcchanged = 1;
 		}
@@ -2500,6 +2497,7 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version) {
 	const uint8_t *ptr;
 	uint16_t block;
 	uint32_t bcrc;
+	uint32_t crc;
 	int32_t retsize;
 	int status;
 	chunk *c;
@@ -2551,7 +2549,8 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version) {
 #endif
 		bcrc = get32bit(&ptr);
 #ifdef PRESERVE_BLOCK
-		if (bcrc!=mycrc32(0,c->block,MFSBLOCKSIZE)) {
+		crc = mycrc32(0,c->block,MFSBLOCKSIZE);
+		if (bcrc!=crc) {
 #else /* PRESERVE_BLOCK */
 		if (bcrc!=mycrc32(0,blockbuffer,MFSBLOCKSIZE)) {
 #endif /* PRESERVE_BLOCK */

@@ -902,8 +902,14 @@ int chunk_repair(uint8_t goal,uint64_t ochunkid,uint32_t *nversion) {
 		}
 	}
 	if (bestversion==0) {	// didn't find sensible chunk - so erase it
-		chunk_delete_file_int(c,goal);
-		return 1;
+		//chunk_delete_file_int(c,goal);
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid == INVALID && s->version==bestversion) {
+				matocsserv_send_fix_checksum(s->ptr,ochunkid,bestversion);
+			}
+		}
+
+		return 0;
 	}
 	if (c->allvalidcopies>0 || c->regularvalidcopies>0) {
 		if (c->allvalidcopies>0) {
