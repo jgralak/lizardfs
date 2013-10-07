@@ -135,7 +135,7 @@ typedef struct packetstruct {
 /** Client entry in the server. */
 typedef struct matoclserventry {
 	/** This looks to be the client type. This is set in matoclserv_serve and matoclserv_fuse_register, and there are 3 possible values:
-	 * 
+	 *
 	 *    0: new client (default, just after TCP accept)
 	 *       This is referred to as "unregistered clients".
 	 *    1: FUSE_REGISTER_BLOB_NOACL       or (FUSE_REGISTER_BLOB_ACL and (REGISTER_NEWSESSION or REGISTER_NEWMETASESSION or REGISTER_RECONNECT))
@@ -194,6 +194,18 @@ void matoclserv_stats(uint64_t stats[5]) {
 	stats_brcvd = 0;
 	stats_bsent = 0;
 }
+
+// usage structures
+typedef struct cpu_usage {
+    time_t check_time;
+    timeval usage_time;
+} cpu_usage;
+
+static const int32_t usage_wnd_size = 5;
+static cpu_usage last_usage[usage_wnd_size];
+static int32_t u_index = 0;
+static const double cpu_u_threshold = 10.0;
+
 
 /* CACHENOTIFY
 // cache notification routines
@@ -271,6 +283,78 @@ static inline void matoclserv_show_notification_dirs(void) {
 	}
 }
 */
+
+/* CPU check procedures */
+void matoclserv_update_usages_table(){
+
+    time_t now;
+    rusage ru;
+    cpu_usage last, new_us;
+
+    now = time(NULL);
+    last = last_usage[u_index];
+    getrusage(RUSAGE_SELF,&ru);
+    new_us.check_time = now;
+    new_us.usage_time = ru.ru_utime;
+
+    if (last.check_time != now) {                               // second has changed
+        u_index = (++u_index < usage_wnd_size) ? u_index : 0;   // usage index always points to "now"
+    }
+
+    last_usage[u_index] = new_us;
+}
+
+// returns cpu usage from the end of the "window"
+cpu_usage matoclserv_get_previous_usage(){
+
+    int32_t index = ((u_index + 1) >= usage_wnd_size) ? 0 : u_index + 1;
+
+    if (last_usage[index].check_time != 0) {
+        return last_usage[index];
+    } else {                                                    // array is not filled yet, try to take usage from last second
+        index = ((u_index - 1) < 0) ? usage_wnd_size -1 : u_index - 1;
+        if (last_usage[index].check_time != 0) {
+            return last_usage[index];
+        }
+        return last_usage[u_index];                             // return value for current second
+    }
+}
+
+bool matoclserv_can_print_image() {
+
+    matoclserv_update_usages_table();
+
+    cpu_usage now, prev;
+    time_t diff;
+
+    now = last_usage[u_index];
+    prev = matoclserv_get_previous_usage();
+    diff = (now.check_time - prev.check_time) * 1000; // time difference in ms
+
+    if (diff > 0)
+    {
+        // runtime diff in ms
+        double ru_diff;
+        double cpu_u;
+
+        ru_diff = (now.usage_time.tv_sec * 1000.0 + now.usage_time.tv_usec/1000.0) - (prev.usage_time.tv_sec * 1000.0 + prev.usage_time.tv_usec/1000.0);
+        ru_diff = (ru_diff >= 0.0) ? ru_diff : 0.0; // ru_diff below zero ? should not happen
+        cpu_u = (ru_diff / (double)diff) * 100.0 ; // cpu usage time in %
+
+        syslog(LOG_NOTICE,">>> USAGE %.2f ", cpu_u  );
+
+        if (cpu_u >= cpu_u_threshold) { // usage over threshold, do not print image
+            syslog(LOG_NOTICE,">>> over threshold, do not print image ");
+            return false;
+        } else {
+            return true;
+        }
+    } else {
+        return true;
+    }
+}
+
+
 
 /* new registration procedure */
 session* matoclserv_new_session(uint8_t newsession,uint8_t nonewid) {
@@ -869,7 +953,12 @@ void matoclserv_chart(matoclserventry *eptr,const uint8_t *data,uint32_t length)
 	chartid = get32bit(&data);
 
 	if(chartid <= CHARTS_CSV_CHARTID_BASE){
-		l = charts_make_png(chartid);
+        if (matoclserv_can_print_image()) {
+            l = charts_make_png(chartid);
+        } else {
+           l = charts_make_empty_png();
+        }
+
 		ptr = matoclserv_createpacket(eptr,ANTOCL_CHART,l);
 		if (l>0) {
 			charts_get_png(ptr);
@@ -883,20 +972,20 @@ void matoclserv_chart(matoclserventry *eptr,const uint8_t *data,uint32_t length)
 	}
 }
 
-void matoclserv_chart_data(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_chart_data(matoclserventry *eptr,const uint8_t *data,uint32_t data_length) {
 	uint32_t chartid;
 	uint8_t *ptr;
-	uint32_t l;
+	uint32_t length;
 
-	if (length!=4) {
-		syslog(LOG_NOTICE,"CLTOAN_CHART_DATA - wrong size (%" PRIu32 "/4)",length);
+	if (data_length!=4) {
+		syslog(LOG_NOTICE,"CLTOAN_CHART_DATA - wrong size (%" PRIu32 "/4)",data_length);
 		eptr->mode = KILL;
 		return;
 	}
 	chartid = get32bit(&data);
-	l = charts_datasize(chartid);
-	ptr = matoclserv_createpacket(eptr,ANTOCL_CHART_DATA,l);
-	if (l>0) {
+	length = charts_datasize(chartid);
+	ptr = matoclserv_createpacket(eptr,ANTOCL_CHART_DATA,length);
+	if (length>0) {
 		charts_makedata(ptr,chartid);
 	}
 }
