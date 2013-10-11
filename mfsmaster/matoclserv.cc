@@ -198,7 +198,7 @@ void matoclserv_stats(uint64_t stats[5]) {
 // usage structures
 typedef struct cpu_usage {
     time_t check_time;
-    timeval usage_time;
+    time_t usage_time;
 } cpu_usage;
 
 static const int32_t usage_wnd_size = 5;
@@ -295,7 +295,8 @@ void matoclserv_update_usages_table(){
     last = last_usage[u_index];
     getrusage(RUSAGE_SELF,&ru);
     new_us.check_time = now;
-    new_us.usage_time = ru.ru_utime;
+    new_us.usage_time = ru.ru_utime.tv_sec * 1000.0 + ru.ru_utime.tv_usec / 1000.0;       // add time in userspace
+    new_us.usage_time += ru.ru_stime.tv_sec * 1000.0 + ru.ru_stime.tv_usec / 1000.0;    // add time in kernelspace
 
     if (last.check_time != now) {                               // second has changed
         u_index = (++u_index < usage_wnd_size) ? u_index : 0;   // usage index always points to "now"
@@ -337,7 +338,7 @@ bool matoclserv_can_print_image() {
         double ru_diff;
         double cpu_u;
 
-        ru_diff = (now.usage_time.tv_sec * 1000.0 + now.usage_time.tv_usec/1000.0) - (prev.usage_time.tv_sec * 1000.0 + prev.usage_time.tv_usec/1000.0);
+        ru_diff = now.usage_time - prev.usage_time;
         ru_diff = (ru_diff >= 0.0) ? ru_diff : 0.0; // ru_diff below zero ? should not happen
         cpu_u = (ru_diff / (double)diff) * 100.0 ; // cpu usage time in %
 
