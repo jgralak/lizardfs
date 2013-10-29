@@ -29,11 +29,13 @@ set(DEFAULT_USER "mfs" CACHE STRING "Default user to run daemons as")
 set(DEFAULT_GROUP "mfs" CACHE STRING "Default group to run daemons as")
 set(ENABLE_LIGHTMFS NO CACHE BOOL "Enable light version of LizardFS")
 set(ENABLE_DEBIAN_PATHS NO CACHE BOOL "Enable Debian-style install paths")
+set(ENABLE_TESTS  NO CACHE STRING "Enable building tests")
 
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "ENABLE_LIGHTMFS: ${ENABLE_LIGHTMFS}")
 message(STATUS "ENABLE_DEBIAN_PATHS: ${ENABLE_DEBIAN_PATHS}")
+message(STATUS "ENABLE_TESTS: ${ENABLE_TESTS}")
 
 if(ENABLE_DEBIAN_PATHS)
   if (NOT CMAKE_INSTALL_PREFIX STREQUAL "/")
@@ -87,6 +89,7 @@ include_directories(${CMAKE_BINARY_DIR}) # Here we have generated config.h
 # main.cc shared by some LizardFS applications
 set(MAIN_SRC ${CMAKE_SOURCE_DIR}/src/main/main.cc)
 
+add_subdirectory(external)
 add_subdirectory(src/common)
 add_subdirectory(src/chunkserver)
 add_subdirectory(src/master)
